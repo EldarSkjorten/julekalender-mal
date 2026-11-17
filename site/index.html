@@ -1,0 +1,763 @@
+<!--
+  📌 JULEKALENDER – KORTVERSJON
+
+  1) Endre innhold (enklest i editoren, se README.md):
+     - Alt ligger i data/days.json: "year", "title" (overskrift), "subtitle" (undertekst), "info" (teksten bak i-knappen)
+       og "days" med "title", "text", "apple" og "spotify" for hver luke.
+     - Tom streng ("") i apple/spotify skjuler knappen. Tom "subtitle" skjuler undertekstene. Tom "info" skjuler i-knappen.
+
+  3) Testmodus:
+     - Legg til ?test i adressen (f.eks. .../index.html?test)
+     - Alle luker åpnes, og en TESTMODUS-markør vises øverst
+
+  4) Datostyring (uten ?test), alltid i norsk tid (Europe/Oslo):
+     - Før 1. desember: alt lukket
+     - I desember: luke n åpnes når datoen >= n
+     - Åpnede luker blir stående åpne til og med 31. januar året etter
+     - Fra 1. februar: alt lukket igjen (også neste desember, til ny kalender er lagt inn)
+
+  ⚠️ HVER JUL: sett riktig år ("year") i data/days.json.
+     Det gjøres enklest i editoren (feltet «Kalenderår»), som tar året med når du eksporterer.
+     Er året feil eller mangler, står lukene låst.
+     Testmodus (?test) viser året og varsler hvis det ser feil ut.
+
+  5) Bevegelse: lysslynge, glød og åpne-animasjon slås av ved redusert bevegelse (prefers-reduced-motion)
+
+  6) Stier er relative, så mappen kan ligge på rot, i en undermappe eller på et underdomene.
+-->
+
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Julekalender</title>
+  <style>
+    /* Selvhostet font (ingen avhengighet av Google Fonts) */
+    @font-face{font-family:'Mountains of Christmas';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/mountains-of-christmas-400.woff2) format('woff2')}
+    @font-face{font-family:'Mountains of Christmas';font-style:normal;font-weight:700;font-display:swap;src:url(fonts/mountains-of-christmas-700.woff2) format('woff2')}
+
+    :root{
+      /* Farger & fonter */
+      --bg:#0c111b; --card:#101827; --text:#eef2f7; --muted:#94a3b8;
+      --title-font:'Mountains of Christmas', cursive;
+      /* Julerøde fliser */
+      --tile-red-1:#b91c1b;        /* base */
+      --tile-red-2:#b91c1b;        /* base (jevnt) */
+      --tile-red-1-hover:#da1717;  /* hover lysere */
+      --tile-red-2-hover:#da1717;  /* hover lysere */
+      --tile-red-dim-1:#4f1c1b;    /* låst lysere */
+      --tile-red-dim-2:#34100f;    /* låst mørkere */
+      --tile-border:#6b1f1c;
+    }
+
+    *{box-sizing:border-box}
+    body{margin:0;-webkit-text-size-adjust:100%;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:var(--text);background:radial-gradient(1200px 600px at 50% -200px,#1b2437,var(--bg));min-height:100dvh}
+
+    header{text-align:center;padding:84px 0 8px}
+    header h1{font-family:var(--title-font);font-size:2.4rem;margin:0}
+    header p{color:var(--muted);margin:.25rem 0 0}
+    [hidden]{display:none!important}
+    @media (min-width:768px){header h1{font-size:2.8rem}}
+    @media (max-width:520px){header{padding-top:70px}}
+
+    /* Feilbanner */
+    .banner{display:none;background:#7c2d12;color:#fff;padding:12px 16px;border-radius:10px;margin:14px auto;width:calc(100% - 32px);max-width:900px;text-align:center;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;font-size:.95rem}
+
+    /* Layout */
+    .container{width:min(1100px,92%);margin:0 auto}
+    main.container{padding:24px clamp(16px,4vw,28px) 80px}
+
+    .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:32px;padding:20px 0}
+    @media (max-width:1024px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media (max-width:700px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media (max-width:380px){.grid{grid-template-columns:minmax(0,1fr)}}
+
+    /* Luker */
+    .card{min-width:0;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;aspect-ratio:1/1;border-radius:22px;border:1.5px solid var(--tile-border);background:linear-gradient(145deg,var(--tile-red-1),var(--tile-red-2));box-shadow:0 10px 24px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.06), inset 0 -1px 0 rgba(0,0,0,.25);transition:transform .18s ease, box-shadow .18s ease, background .18s ease;cursor:pointer}
+    .card.locked{background:linear-gradient(145deg,var(--tile-red-dim-1),var(--tile-red-dim-2));filter:saturate(.95);cursor:not-allowed}
+    @media (hover:hover){.card:not(.locked):hover{transform:scale(1.02);box-shadow:0 14px 36px rgba(0,0,0,.35);background:linear-gradient(145deg,var(--tile-red-1-hover),var(--tile-red-2-hover))}}
+
+    /* Ikon (outline) over tallet */
+    .status{display:flex;align-items:center;justify-content:center;margin-bottom:6px}
+    .status svg{width:28px;height:28px;stroke:rgba(255,255,255,.95);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+    .card.locked .status svg{stroke:rgba(255,255,255,.7)}
+
+    /* Tallet midtstilt, julefont */
+    .num{font-family:var(--title-font);font-size:2.6rem;line-height:1;color:#fff;margin:6px 0 0 0;text-shadow:0 1px 0 rgba(0,0,0,.35)}
+    .card.locked .num{opacity:.6;filter:brightness(.85)}
+
+    /* Snø bak innholdet */
+    .snow{position:fixed;inset:0;z-index:0;pointer-events:none}
+    .snow::before,.snow::after{content:"";position:absolute;left:0;top:-200px;width:100%;height:calc(100% + 200px);background-image:radial-gradient(2px 2px at 20px 30px,#fff 50%,transparent 51%),radial-gradient(3px 3px at 100px 80px,#fff 50%,transparent 51%),radial-gradient(2px 2px at 200px 50px,#fff 50%,transparent 51%),radial-gradient(3px 3px at 300px 10px,#fff 50%,transparent 51%),radial-gradient(2px 2px at 400px 40px,#fff 50%,transparent 51%);background-size:400px 200px;animation:snow 10s linear infinite;opacity:.75}
+    .snow::after{animation-duration:16s;opacity:.5;filter:blur(1px)}
+    @keyframes snow{to{transform:translateY(200px)}}
+
+        .info-wrap{display:flex;justify-content:center;margin-top:10px;}
+    .info-btn{width:40px;height:40px;border-radius:999px;border:1.5px solid var(--muted);background:rgba(12,17,27,.55);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease, background .15s ease;}
+    .info-btn-inner{width:22px;height:22px;border-radius:999px;border:1.5px solid rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;font-size:13px;font-weight:600;color:rgba(226,232,240,.9);} 
+    @media (hover:hover){.info-btn:hover{transform:translateY(-1px);background:rgba(15,23,42,.8);box-shadow:0 6px 14px rgba(0,0,0,.6);}}
+    .info-btn:focus-visible{outline:3px solid #22c55e;outline-offset:2px;}
+
+    /* Melding når kalenderen er stengt for i år */
+    .nisse{height:1.5em;width:1.5em;vertical-align:-.4em}
+    .closed-note{display:none;text-align:center;color:var(--muted);margin:14px auto 0;padding:0 16px;max-width:900px}
+    .debug-indicator{margin:10px auto 0;width:max-content;max-width:92%;text-align:center;font-size:.85rem;font-weight:700;color:#0c111b;background:#f97316;padding:6px 12px;border-radius:999px;display:none}
+
+    header,main{position:relative;z-index:1}
+
+    /* Modal for åpne luker */
+    .modal{position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.55);padding:16px;z-index:10}
+    .modal.hidden{display:none}
+    .modal-content{background:var(--card);border:1px solid #263453;border-radius:18px;width:min(720px,96%);padding:18px;position:relative;color:var(--text);display:flex;flex-direction:column;gap:12px;max-height:90dvh;overflow:auto;box-shadow:0 18px 40px rgba(0,0,0,.6)}
+    .modal-header{display:flex;align-items:center;justify-content:center}
+    .modal-banner{width:100%;border-radius:14px;padding:12px 16px;background:linear-gradient(145deg,var(--tile-red-1),var(--tile-red-2));position:relative;overflow:hidden;box-shadow:0 8px 20px rgba(0,0,0,.35);margin-bottom:4px}
+    .modal-title{position:relative;z-index:1;font-family:var(--title-font);font-size:1.7rem;margin:0;text-align:center;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.35)}
+    @media (max-width:420px){.modal-title{font-size:1.5rem}}
+    .modal-text{font-size:1rem;line-height:1.5;margin:0}
+    .modal-text p{margin:0 0 0.7em;}
+    .modal-text a{color:#ffd36b;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+    .modal-warning{display:none;margin:0;padding:10px 12px;border-radius:10px;background:#7c2d12;color:#fff;font-size:.9rem;line-height:1.4}
+    .btns{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;justify-content:flex-start}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;color:#fff;text-decoration:none;font-weight:700;border:none;cursor:pointer}
+    .btn svg{width:18px;height:18px;fill:currentColor}
+    .btn-apple{background:#fa233b}
+    .btn-spotify{background:#1db954}
+    .btn-secondary{background:#374151}
+    .btn:focus-visible{outline:3px solid #22c55e;outline-offset:2px}
+
+    /* ===== Fokus, melding og felles byggeklosser ===== */
+    .card:focus-visible{outline:3px solid #22c55e;outline-offset:3px}
+    .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,16px);max-width:92%;text-align:center;background:rgba(16,24,39,.96);border:1px solid #263453;color:var(--text);padding:10px 16px;border-radius:999px;font-size:.95rem;opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;z-index:20}
+    .toast.show{opacity:1;transform:translate(-50%,0)}
+    @keyframes nope{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+
+    /* ===== Lysslynge øverst: ledning med gamle juletrelys (tegnes av drawLights) ===== */
+    .lights{position:absolute;top:0;left:0;width:100%;height:210px;pointer-events:none;z-index:1;overflow:hidden}
+    .lights svg{display:block}
+    .lights .halo{opacity:.85;animation:breathe var(--d,6.5s) ease-in-out infinite alternate;animation-delay:var(--o,0s)}
+    @keyframes breathe{from{opacity:.38}to{opacity:1}}
+
+    /* ===== Stjernestøv: et lite glitr som flyr over toppen når kalenderen åpnes (bare transform og opacity) ===== */
+    .dust{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+    .dust i{position:absolute;left:var(--x);top:var(--y);width:var(--s);height:var(--s);border-radius:50%;background:radial-gradient(circle,#fff4cc 0,#ffd36b 55%,rgba(255,211,107,0) 100%);box-shadow:0 0 8px 2px rgba(255,211,107,.55);opacity:0;animation:dust var(--t) ease-out var(--d) both}
+    @keyframes dust{0%{opacity:0;transform:translate(0,0) scale(.3)}18%{opacity:1;transform:translate(calc(var(--dx) * .2),calc(var(--dy) * .15)) scale(1)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.4)}}
+
+    /* Variant «stjerne»: en lys stjerne flyr i en bue fra venstre til høyre og slipper små stjerner som faller og blekner.
+       Stjernen følger samme bue som støvet starter på: sideveis jevnt (starX), og opp og ned i åtte rette trinn som tilnærmer en sinuskurve (starY). */
+    .dust{--star:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cdefs%3E%3CradialGradient%20id='g'%20cx='50%25'%20cy='50%25'%20r='50%25'%3E%3Cstop%20offset='0'%20stop-color='%23ffffff'/%3E%3Cstop%20offset='.45'%20stop-color='%23fff4cc'/%3E%3Cstop%20offset='1'%20stop-color='%23ffd36b'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath%20fill='url(%23g)'%20d='M12%200C12.8%207.2%2016.8%2011.2%2024%2012C16.8%2012.8%2012.8%2016.8%2012%2024C11.2%2016.8%207.2%2012.8%200%2012C7.2%2011.2%2011.2%207.2%2012%200Z'/%3E%3C/svg%3E")}
+    .dust.stars{--y0:20vh;--A:11vh}
+    .dust.stars i{border-radius:0;box-shadow:none;background:var(--star) center/72% 72% no-repeat,radial-gradient(circle,rgba(255,211,107,.4) 0,rgba(255,211,107,0) 68%);animation-name:dustStar}
+    @keyframes dustStar{0%{opacity:0;transform:translate(0,0) rotate(var(--r)) scale(.3)}18%{opacity:1;transform:translate(calc(var(--dx) * .2),calc(var(--dy) * .15)) rotate(calc(var(--r) + 20deg)) scale(1)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(calc(var(--r) + 110deg)) scale(.4)}}
+    .dust .lead{position:absolute;left:0;top:var(--y0);width:0;height:0;animation:starX var(--T) linear both}
+    .dust .lead-y{position:absolute;left:0;top:0;width:0;height:0;animation:starY var(--T) linear both}
+    .dust .lead-star{position:absolute;left:-11px;top:-11px;width:22px;height:22px;background:var(--star) center/100% 100% no-repeat;filter:drop-shadow(0 0 4px rgba(255,211,107,.95)) drop-shadow(0 0 10px rgba(255,211,107,.55));animation:starSpin var(--T) linear both}
+    @keyframes starX{from{transform:translateX(-4vw)}to{transform:translateX(104vw)}}
+    @keyframes starY{0%{transform:translateY(0)}12.5%{transform:translateY(calc(var(--A) * -.3827))}25%{transform:translateY(calc(var(--A) * -.7071))}37.5%{transform:translateY(calc(var(--A) * -.9239))}50%{transform:translateY(calc(var(--A) * -1))}62.5%{transform:translateY(calc(var(--A) * -.9239))}75%{transform:translateY(calc(var(--A) * -.7071))}87.5%{transform:translateY(calc(var(--A) * -.3827))}100%{transform:translateY(0)}}
+    @keyframes starSpin{0%{opacity:0;transform:rotate(0deg) scale(.6)}8%{opacity:1;transform:rotate(30deg) scale(1)}90%{opacity:1;transform:rotate(300deg) scale(1)}100%{opacity:0;transform:rotate(360deg) scale(.6)}}
+
+    /* ===== Luker: rolig glød på åpne luker, trykk-respons og stjerne når åpnet ===== */
+    .card{z-index:0}
+    .card:not(.locked)::before{content:"";position:absolute;inset:0;border-radius:22px;z-index:-1;box-shadow:0 0 26px 7px rgba(255,170,150,.55);opacity:.35;animation:glow 7.5s ease-in-out infinite alternate;animation-delay:calc(var(--i) * -1.15s);pointer-events:none}
+    @keyframes glow{to{opacity:.95}}
+    .card:not(.locked):active{transform:scale(.94)}
+    .card.opening{animation:pop .4s cubic-bezier(.3,1.6,.5,1)}
+    .card.opening::before{animation:flash .6s ease-out forwards}
+    @keyframes flash{0%{opacity:.5;transform:scale(1)}45%{opacity:1;transform:scale(1.14)}100%{opacity:.95;transform:scale(1.1)}}
+    @keyframes pop{40%{transform:scale(1.1)}}
+    .card.nope .status,.card.nope .num{animation:nope .45s ease}
+    .badge{position:absolute;top:10px;right:10px;width:22px;height:22px;display:none;place-items:center;border-radius:50%;background:rgba(12,17,27,.55)}
+    .badge svg{width:14px;height:14px;fill:var(--text);stroke:none}
+    .card.seen .badge{display:grid}
+    .spark{position:absolute;left:50%;top:50%;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:#fff;box-shadow:0 0 8px 2px rgba(255,200,190,.9);pointer-events:none;animation:spark 1.1s ease-out forwards}
+    @keyframes spark{from{transform:translate(0,0) scale(1);opacity:1}to{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}
+
+    /* ===== Vinduet vokser ut fra luka og trekker seg tilbake dit når det lukkes ===== */
+    .modal:not(.hidden){animation:fadeIn .5s ease}
+    .modal:not(.hidden) .modal-content{animation:growIn .75s cubic-bezier(.2,.85,.25,1)}
+    .modal.closing{animation:fadeOut .45s ease forwards}
+    .modal.closing .modal-content{animation:growOut .45s cubic-bezier(.55,0,.75,.35) forwards}
+    @keyframes fadeIn{from{opacity:0}}
+    @keyframes fadeOut{to{opacity:0}}
+    @keyframes growIn{from{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px)) scale(var(--s,.2))}35%{opacity:1}}
+    @keyframes growOut{65%{opacity:1}to{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px)) scale(var(--s,.2))}}
+
+    /* ===== Redusert bevegelse: ingen animasjoner eller overganger ===== */
+    @media (prefers-reduced-motion: reduce){
+      *,*::before,*::after{animation:none!important;transition:none!important}
+    }
+  </style>
+</head>
+<body>
+  <div class="snow"></div>
+  <div id="lights" class="lights" aria-hidden="true"></div>
+  <header class="container">
+    <h1 id="title">🎄 Julekalender</h1>
+    <p id="subtitle" hidden></p>
+  </header>
+
+  <div class="info-wrap" hidden>
+    <button id="info-btn" class="info-btn" type="button" aria-label="Informasjon om julekalenderen">
+      <span class="info-btn-inner">i</span>
+    </button>
+  </div>
+
+  <div id="debug-indicator" class="debug-indicator" role="status"></div>
+
+  <!-- Feil-/statusbanner (midtstilt) -->
+  <div id="err" class="banner"></div>
+  <div id="year-warning" class="banner" role="alert"></div>
+  <p id="closed-note" class="closed-note" role="status"></p>
+
+  <main class="container">
+    <div id="grid" class="grid"></div>
+  </main>
+
+  <!-- Modal for åpne luker -->
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-banner">
+          <h2 id="modal-title" class="modal-title"></h2>
+        </div>
+      </div>
+      <p id="modal-warning" class="modal-warning" role="alert"></p>
+      <p id="modal-text" class="modal-text"></p>
+      <div class="btns">
+        <a id="btn-apple" class="btn btn-apple" target="_blank" rel="noopener" aria-label="Åpne i Apple Music">
+  Apple Music
+</a>
+<a id="btn-spotify" class="btn btn-spotify" target="_blank" rel="noopener" aria-label="Åpne i Spotify">
+  Spotify
+</a>
+        <button id="btn-close" class="btn btn-secondary" type="button">Lukk</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="info-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Om julekalenderen</h2>
+      </div>
+      <p id="info-text" class="modal-text"></p>
+      <div class="btns">
+        <button id="info-close" class="btn btn-secondary" type="button">Lukk</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Liten melding ved trykk på låst luke -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+// Året kalenderen gjelder for. Leses fra "year" i data/days.json (settes i editoren, se README.md)
+let CALENDAR_YEAR = null;
+
+// Åpnede luker låses igjen 1. februar året etter (siste åpne dag er 31. januar)
+const CLOSE_MONTH = 2;
+
+// Testmodus: legg til ?test i adressen for å åpne ALLE luker
+const TEST_MODE = new URLSearchParams(location.search).has('test');
+
+// Dagens år, måned (1-12) og dag i norsk tid, uavhengig av enhetens tidssone
+function osloToday(){
+  const parts = new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Oslo',year:'numeric',month:'numeric',day:'numeric'}).formatToParts(new Date());
+  const get = type => Number(parts.find(p=>p.type===type).value);
+  return { year:get('year'), month:get('month'), day:get('day') };
+}
+
+// Dato som ett tall (ÅÅÅÅMMDD) så datoer kan sammenlignes direkte
+const ymd = (y,m,d) => y*10000 + m*100 + d;
+
+// Har kalenderen stengt for i år? (fra og med 1. februar året etter kalenderåret, helt til ny kalender er lagt inn)
+function isClosedForGood(){
+  if (!CALENDAR_YEAR) return false;
+  const t = osloToday();
+  return ymd(t.year,t.month,t.day) >= ymd(CALENDAR_YEAR+1,CLOSE_MONTH,1);
+}
+
+// Er det før 1. desember i kalenderåret? (da er alt låst, og vi sier når den åpner)
+function isBeforeOpening(){
+  if (!CALENDAR_YEAR) return false;
+  const t = osloToday();
+  return ymd(t.year,t.month,t.day) < ymd(CALENDAR_YEAR,12,1);
+}
+
+// Dato-styrt åpning av luker: luke n er åpen fra n. desember CALENDAR_YEAR til 31. januar året etter
+function isDoorOpen(day){
+  if (TEST_MODE) return true;
+  if (!CALENDAR_YEAR) return false;      // uten år vet vi ikke når lukene skal åpnes
+
+  const t = osloToday();
+  const today = ymd(t.year,t.month,t.day);
+  return today >= ymd(CALENDAR_YEAR,12,day) && today < ymd(CALENDAR_YEAR+1,CLOSE_MONTH,1);
+}
+
+// Hvilket kalenderår dagens dato hører til (januar tilhører fjorårets kalender)
+function expectedCalendarYear(){
+  const t = osloToday();
+  return t.month === 1 ? t.year - 1 : t.year;
+}
+
+const DATA_URLS = ['data/days.json'];
+
+const prefersReducedMotion = () => !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+// Hvilke luker er åpnet på denne enheten (lagres lokalt; virker også uten lagring)
+let SEEN_KEY = '';
+const seen = new Set();
+function loadSeen(){
+  SEEN_KEY = `julekalender-opened-${CALENDAR_YEAR}${TEST_MODE ? '-test' : ''}`;
+  seen.clear();
+  try{ JSON.parse(localStorage.getItem(SEEN_KEY) || '[]').forEach(n => seen.add(Number(n))); }catch(e){}
+}
+function rememberOpened(day){
+  seen.add(day);
+  try{ localStorage.setItem(SEEN_KEY, JSON.stringify([...seen])); }catch(e){}
+}
+
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalText = document.getElementById('modal-text');
+    const btnApple = document.getElementById('btn-apple');
+    const btnSpotify = document.getElementById('btn-spotify');
+    const btnClose = document.getElementById('btn-close');
+    const infoModal = document.getElementById('info-modal');
+    const infoText = document.getElementById('info-text');
+    const infoBtn = document.getElementById('info-btn');
+    const infoClose = document.getElementById('info-close');
+    const debugIndicator = document.getElementById('debug-indicator');
+    const modalWarning = document.getElementById('modal-warning');
+
+    // Testmarkør, årsvarsel og stengt-melding. Kjøres når days.json er lest (da er året kjent)
+    function showStatus(){
+      if (TEST_MODE && debugIndicator) {
+        debugIndicator.textContent = `TESTMODUS – alle luker er åpne nå · kalender for ${CALENDAR_YEAR || 'ukjent år'}`;
+        debugIndicator.style.display = 'block';
+
+        // Varsle hvis året i days.json mangler eller ikke passer med dagens dato
+        const expected = expectedCalendarYear();
+        let msg = '';
+        if (!CALENDAR_YEAR) {
+          msg = '⚠️ days.json mangler året ("year"), så lukene blir stående låst for mottakerne. Sett kalenderåret i editoren og eksporter på nytt (se README.md).';
+        } else if (CALENDAR_YEAR !== expected) {
+          msg = `⚠️ Kalenderen er satt til ${CALENDAR_YEAR}, men dagens dato hører til kalenderen for ${expected}. Sett riktig kalenderår i editoren og eksporter days.json på nytt før du publiserer (se README.md).`;
+        }
+        if (msg) {
+          const warn = document.getElementById('year-warning');
+          warn.textContent = msg;
+          warn.style.display = 'block';
+          modalWarning.textContent = msg;   // vises også i hver åpnet luke
+          modalWarning.style.display = 'block';
+        }
+      }
+
+      // Etter 1. februar: forklar hvorfor alt er låst
+      if (!TEST_MODE && isClosedForGood()) {
+        const note = document.getElementById('closed-note');
+        note.textContent = 'Julekalenderen er stengt for denne gangen. Velkommen tilbake til neste jul!';
+        note.style.display = 'block';
+      }
+      // Før 1. desember: si når den åpner
+      if (!TEST_MODE && isBeforeOpening()) {
+        const note = document.getElementById('closed-note');
+        note.textContent = 'Velkommen tilbake 1. desember. ';
+        const nisse = document.createElement('img');          // egen emoji: smilefjes med nisselue
+        nisse.src = 'img/nisse.png'; nisse.alt = '😊'; nisse.className = 'nisse'; nisse.width = 24; nisse.height = 24;
+        note.append(nisse);
+        note.style.display = 'block';
+      }
+    }
+
+    // Tekstene øverst på siden og i info-vinduet kommer fra days.json (title, subtitle, info)
+    let INFO_TEXT = '';
+    function applyTexts(t){
+      const title = (t.title || '').trim() || 'Julekalender';
+      document.getElementById('title').textContent = '🎄 ' + title;
+      document.title = title;
+      const sub = document.getElementById('subtitle');
+      sub.textContent = (t.subtitle || '').trim();
+      sub.hidden = !sub.textContent;
+      INFO_TEXT = t.info || '';
+      document.querySelector('.info-wrap').hidden = !INFO_TEXT.trim();
+    }
+
+    // Tekst i luker og info-vindu: en tom linje gir nytt avsnitt, et linjeskift gir ny linje.
+    // Enkel formatering: **fet**, *kursiv*, [lenketekst](https://adresse) og nettadresser som blir klikkbare.
+    // Alt lages som DOM-noder (aldri innerHTML), så HTML i teksten vises bare som tekst, og bare http- og https-adresser blir lenker.
+    function inlineNodes(text){
+      const out = [], re = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"]+)|\*\*([^*\n]+)\*\*|\*([^*\s](?:[^*\n]*[^*\s])?)\*/g;   // kursiv kan ikke starte eller slutte med mellomrom (som i Markdown), så «5 * 3» står i fred
+      const link = (url, label) => { const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = label; return a; };
+      let last = 0, m;
+      while((m = re.exec(text))){
+        if(m.index > last) out.push(document.createTextNode(text.slice(last, m.index)));
+        if(m[1]) out.push(link(m[2], m[1]));
+        else if(m[3]){                                   // nettadresse i teksten: tegnsetting rett etter hører ikke til adressen
+          const tail = (m[3].match(/[.,!?:;)]+$/) || [''])[0], url = m[3].slice(0, m[3].length - tail.length);
+          out.push(link(url, url)); if(tail) out.push(document.createTextNode(tail));
+        }
+        else { const el = document.createElement(m[4] ? 'strong' : 'em'); el.append(...inlineNodes(m[4] || m[5])); out.push(el); }
+        last = re.lastIndex;
+      }
+      if(last < text.length) out.push(document.createTextNode(text.slice(last)));
+      return out;
+    }
+    function formatModalText(raw){
+      return String(raw || '').replace(/\r\n/g,'\n').trim().split(/\n\s*\n/).filter(p => p.trim()).map(par => {
+        const p = document.createElement('p');
+        par.split('\n').forEach((line, k) => { if(k) p.append(document.createElement('br')); p.append(...inlineNodes(line)); });
+        return p;
+      });
+    }
+
+    function showFriendlyError(){
+      const el = document.getElementById('err');
+      el.textContent = location.protocol === 'file:'
+        ? 'Kalenderen er åpnet som en lokal fil, og da kan ikke nettleseren lese days.json. Åpne den fra nettadressen i stedet (se veiledningen for å teste lokalt).'
+        : 'Oisann, det er noe feil her. Send meg en melding, så jeg kan se på det! I mellomtiden kan du synge en sang selv... 🎅🏼';
+      el.style.display = 'block';
+    }
+
+    function placeholderDays(){
+      return Array.from({length:24}, (_,i)=>({
+        title: `${i+1}. desember`,
+        text: '',
+        apple: '',
+        spotify: ''
+      }));
+    }
+
+    async function fetchJson(url){
+      const res = await fetch(url,{cache:'no-store'});
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      return res.json();
+    }
+
+    // days.json: { "year": 2026, "title": "…", "subtitle": "…", "info": "…", "days": [ {title,text,apple,spotify}, ... ] }
+    // (en ren liste uten år leses også, men da vet vi ikke når lukene skal åpnes)
+    function parseData(data){
+      const list = Array.isArray(data) ? data : (data && Array.isArray(data.days) ? data.days : null);
+      if(!list || !list.length) return null;
+      const y = Array.isArray(data) ? NaN : Number(data.year);
+      const str = v => typeof v === 'string' ? v : '';
+      const base = placeholderDays();
+      return {
+        year: Number.isInteger(y) && y >= 2000 && y <= 2200 ? y : null,
+        title: Array.isArray(data) ? '' : str(data.title),
+        subtitle: Array.isArray(data) ? '' : str(data.subtitle),
+        info: Array.isArray(data) ? '' : str(data.info),
+        days: base.map((d,idx)=>({ ...d, ...(list[idx]||{}) }))
+      };
+    }
+
+    async function loadDays(){
+      for(const url of DATA_URLS){
+        try{
+          const parsed = parseData(await fetchJson(url));
+          if(parsed){
+            if(!parsed.year) showFriendlyError();   // uten år blir alt låst
+            return parsed;
+          }
+        }catch(e){/* prøv neste */}
+      }
+      showFriendlyError();
+      return { year:null, title:'', subtitle:'', info:'', days:placeholderDays() };
+    }
+
+    function openModal(day,item){
+      const title = item && (item.title || item.date) ? (item.title || item.date) : `${day}. desember`;
+      modalTitle.textContent = title;
+      modalText.replaceChildren(...formatModalText(item && item.text ? item.text : ''));
+
+      if(item && item.apple){
+        btnApple.href = item.apple;
+        btnApple.style.display = 'inline-flex';
+      }else{
+        btnApple.style.display = 'none';
+      }
+      if(item && item.spotify){
+        btnSpotify.href = item.spotify;
+        btnSpotify.style.display = 'inline-flex';
+      }else{
+        btnSpotify.style.display = 'none';
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function openInfo(){
+      infoText.replaceChildren(...formatModalText(INFO_TEXT));
+      infoModal.classList.remove('hidden');
+    }
+
+    // Liten melding nederst (f.eks. når man trykker på en låst luke)
+    let toastTimer;
+    function showToast(msg){
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(()=>t.classList.remove('show'), 2400);
+    }
+
+    function lockedTap(card,day){
+      showToast(isClosedForGood() ? 'Kalenderen er stengt for denne gangen.' : `Luke ${day} åpnes ${day}. desember.`);
+      card.classList.remove('nope');
+      void card.offsetWidth;          // start rista på nytt ved gjentatt trykk
+      card.classList.add('nope');
+    }
+
+    // Lyspunkter som sprer seg fra flisen når luka åpnes
+    function sparkle(card){
+      for(let k=0;k<10;k++){
+        const s = document.createElement('i');
+        s.className = 'spark';
+        const a = Math.PI*2*k/10 + Math.random()*.5, r = 50 + Math.random()*36;
+        s.style.setProperty('--dx', Math.cos(a)*r + 'px');
+        s.style.setProperty('--dy', Math.sin(a)*r + 'px');
+        card.appendChild(s);
+        setTimeout(()=>s.remove(), 1200);
+      }
+    }
+
+    // Vinduet står midt på skjermen og vokser ut fra flisen du trykket på (og tilbake dit når det lukkes).
+    // --dx/--dy er avstanden fra skjermens midte til flisens midte, --s er startstørrelsen.
+    let lastCard = null;
+    function setModalOrigin(card){
+      const r = card.getBoundingClientRect();
+      const box = modal.querySelector('.modal-content');
+      const modalW = Math.min(720, innerWidth * .96);
+      box.style.setProperty('--dx', (r.left + r.width/2 - innerWidth/2) + 'px');
+      box.style.setProperty('--dy', (r.top + r.height/2 - innerHeight/2) + 'px');
+      box.style.setProperty('--s', Math.max(.12, Math.min(.6, r.width / modalW)));
+    }
+
+    // Tid luka får «trykk-animasjon» (glød og lyspunkter) før vinduet begynner å vokse (ms)
+    const OPEN_DELAY = 480;
+
+    function openDoor(card,day,item){
+      if(card.classList.contains('opening')) return;
+      rememberOpened(day);
+      card.classList.add('seen');
+      lastCard = card;
+      if(prefersReducedMotion()){ setModalOrigin(card); openModal(day,item); return; }
+      card.classList.add('opening');
+      sparkle(card);
+      setTimeout(()=>{
+        card.classList.remove('opening');
+        setModalOrigin(card);
+        openModal(day,item);
+      }, OPEN_DELAY);
+    }
+
+    function closeModal(){
+      if(modal.classList.contains('hidden') || modal.classList.contains('closing')) return;
+      if(prefersReducedMotion() || !lastCard){ modal.classList.add('hidden'); return; }
+      setModalOrigin(lastCard);          // flisen kan ha flyttet seg hvis siden er rullet
+      modal.classList.add('closing');
+      const box = modal.querySelector('.modal-content');
+      let done = false;
+      const finish = () => {
+        if(done) return; done = true;
+        box.removeEventListener('animationend', onEnd);
+        modal.classList.remove('closing');
+        modal.classList.add('hidden');
+      };
+      const onEnd = e => { if(e.target === box) finish(); };
+      box.addEventListener('animationend', onEnd);
+      setTimeout(finish, 700);           // sikkerhetsnett hvis animasjonen ikke starter
+    }
+
+    const BADGE = `<span class='badge' aria-hidden='true'><svg viewBox='0 0 24 24'><path d='M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.5l-5.4 3 1.2-6L3.3 9.3l6.1-.7z'/></svg></span>`;
+
+    // Fast «tilfeldighet» (samme tall hver gang for samme n), så utseendet ikke endrer seg ved hver oppdatering
+    function pseudoRandom(n){ const v = Math.sin(n*127.1 + 311.7) * 43758.5453; return v - Math.floor(v); }
+
+    // Lysslynge: en ledning som henger fra noen spikre over toppen, med et par lamper nedover sidene.
+    // Lampene er gamle juletrelys (spiss oval, varmt gult) som gløder rolig.
+    function drawLights(){
+      const host = document.getElementById('lights');
+      if(!host) return;
+      const W = document.documentElement.clientWidth;
+      const narrow = W < 520;
+      const NS = 'http://www.w3.org/2000/svg';
+      const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); for(const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+      const rnd = pseudoRandom;
+
+      const scale = narrow ? .8 : 1;                                  // pærestørrelse
+      const gap = narrow ? 36 : Math.max(46, Math.min(64, W / 30));   // avstand mellom lampene langs ledningen
+      const sag = narrow ? 24 : 34;                                   // hvor mye ledningen henger
+      const drop = narrow ? 100 : 124;                                // hvor langt ned sidene går (ved tittelen)
+      const y0 = 5;
+      const fr = narrow ? [.08, .5, .92] : [.06, .35, .65, .94];      // 3–4 festepunkter
+      const nails = fr.map(f => ({ x: Math.round(W * f), y: y0 }));
+
+      const quad = (a,c,b,t) => ({ x:(1-t)*(1-t)*a.x + 2*(1-t)*t*c.x + t*t*b.x, y:(1-t)*(1-t)*a.y + 2*(1-t)*t*c.y + t*t*b.y });
+      const cubic = (a,c1,c2,b,t) => { const u = 1-t; return { x:u*u*u*a.x + 3*u*u*t*c1.x + 3*u*t*t*c2.x + t*t*t*b.x, y:u*u*u*a.y + 3*u*u*t*c1.y + 3*u*t*t*c2.y + t*t*t*b.y }; };
+
+      // Segmenter: hengende partier mellom spikrene, og en ende som henger ned på hver side
+      const segs = [];
+      for(let i=0;i<nails.length-1;i++){
+        const a = nails[i], b = nails[i+1], c = { x:(a.x+b.x)/2, y:y0 + sag*2 };
+        segs.push({ d:`M${a.x} ${a.y} Q${c.x} ${c.y} ${b.x} ${b.y}`, at:t => quad(a,c,b,t), side:0 });
+      }
+      const L = nails[0], R = nails[nails.length-1];
+      const lc1 = { x:L.x+9, y:y0+drop*.3 }, lc2 = { x:L.x-9, y:y0+drop*.65 }, le = { x:L.x-3, y:y0+drop };
+      const rc1 = { x:R.x-9, y:y0+drop*.3 }, rc2 = { x:R.x+9, y:y0+drop*.65 }, re = { x:R.x+3, y:y0+drop };
+      segs.push({ d:`M${L.x} ${L.y} C${lc1.x} ${lc1.y} ${lc2.x} ${lc2.y} ${le.x} ${le.y}`, at:t => cubic(L,lc1,lc2,le,t), side:1 });
+      segs.push({ d:`M${R.x} ${R.y} C${rc1.x} ${rc1.y} ${rc2.x} ${rc2.y} ${re.x} ${re.y}`, at:t => cubic(R,rc1,rc2,re,t), side:-1 });
+
+      const H = y0 + drop + 44;
+      const svg = mk('svg', { width:W, height:H, viewBox:`0 0 ${W} ${H}`, 'aria-hidden':'true' });
+      const defs = mk('defs', {});
+      const halo = mk('radialGradient', { id:'lg-halo' });
+      [['0','255,214,120','.8'],['.45','255,190,90','.28'],['1','255,180,80','0']].forEach(([o,c,a]) => halo.append(mk('stop', { offset:o, 'stop-color':`rgb(${c})`, 'stop-opacity':a })));
+      const glass = mk('linearGradient', { id:'lg-glass', x1:'0', y1:'0', x2:'0', y2:'1' });
+      [['0','#fff4cc'],['.5','#ffd36b'],['1','#f3a63a']].forEach(([o,c]) => glass.append(mk('stop', { offset:o, 'stop-color':c })));
+      defs.append(halo, glass);
+      svg.append(defs);
+
+      const wires = mk('g', { fill:'none', stroke:'#586889', 'stroke-width':'1.6', 'stroke-linecap':'round' });
+      const bulbs = mk('g', {});
+      let n = 0;
+      segs.forEach(sg => {
+        if(!sg.side) wires.append(mk('path', { d:sg.d }));
+        // Lag en punktliste langs kurven og plasser lampene med jevn avstand
+        const pts = []; let len = 0, prev = null;
+        for(let k=0;k<=60;k++){ const p = sg.at(k/60); if(prev) len += Math.hypot(p.x-prev.x, p.y-prev.y); pts.push({ x:p.x, y:p.y, len }); prev = p; }
+        // Luft rundt festepunktene, og lampene på sideendene starter litt nedenfor spikeren
+        const startAt = sg.side ? (narrow ? 46 : 54) : (narrow ? 30 : 40);
+        const endAt = len - (sg.side ? 22 : (narrow ? 30 : 40));
+        let lastK = 0;
+        const ats = []; for(let at = startAt; at <= endAt; at += gap) ats.push(at);
+        ats.forEach(at => {
+          let k = pts.findIndex(p => p.len >= at); if(k < 1) k = 1;
+          lastK = k;
+          const p = pts[k], q = pts[k-1];
+          const ang = Math.atan2(p.y-q.y, p.x-q.x) * 180/Math.PI;   // ledningens retning
+          let x = p.x, y = p.y, rot;
+          if(sg.side){                       // på sideendene henger alle lampene rett ned, foran ledningen
+            rot = 0;
+          } else rot = Math.max(-22, Math.min(22, ang*.4));
+          n++;
+          const g = mk('g', { transform:`translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${rot.toFixed(1)}) scale(${scale})` });
+          const h = mk('circle', { class:'halo', cx:'0', cy:'17', r:'21', fill:'url(#lg-halo)' });
+          h.setAttribute('style', `--d:${(5.5 + rnd(n)*3.5).toFixed(1)}s;--o:-${(rnd(n+60)*9).toFixed(1)}s`);
+          g.append(
+            h,
+            mk('path', { d:'M-3.4 -1h6.8l.9 6.5h-8.6z', fill:'#6b5a3a' }),                                    // sokkel
+            mk('path', { d:'M-4.6 5.5C-8.8 12-6.6 21 0 30C6.6 21 8.8 12 4.6 5.5Z', fill:'url(#lg-glass)' }),    // pære: spiss oval
+            mk('ellipse', { cx:'-2.5', cy:'12', rx:'1.2', ry:'3.4', fill:'#fff', opacity:'.55', transform:'rotate(10 -2.5 12)' })
+          );
+          bulbs.append(g);
+        });
+        // Sideendene tegnes bare ned til siste pære, så det aldri henger ledning under den
+        if(sg.side && lastK > 0) wires.append(mk('path', { d:'M' + pts.slice(0, lastK + 1).map(p => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' L') }));
+      });
+      const nailDots = mk('g', { fill:'#8190ad' });
+      nails.forEach(p => nailDots.append(mk('circle', { cx:p.x, cy:p.y, r:'2.6' })));
+      svg.append(wires, nailDots, bulbs);
+      host.replaceChildren(svg);
+      drawLights.w = W;
+    }
+    drawLights();
+    // Tegn slyngen på nytt når bredden endres: ved endret vindusstørrelse, og når et rullefelt dukker opp eller forsvinner (ingen resize-hendelse da)
+    let lightsTimer;
+    const redrawLights = () => {
+      clearTimeout(lightsTimer);
+      lightsTimer = setTimeout(() => { if(document.documentElement.clientWidth !== drawLights.w) drawLights(); }, 100);
+    };
+    window.addEventListener('resize', redrawLights);
+    if('ResizeObserver' in window) new ResizeObserver(redrawLights).observe(document.documentElement);
+
+    function render(days){
+      const grid=document.getElementById('grid');
+      grid.innerHTML='';
+      for(let i=0;i<24;i++){
+        const d = days[i] || { title:`${i+1}. desember` };
+        const day = i+1;
+        const open = isDoorOpen(day);
+        const card=document.createElement('button');
+        card.className = 'card' + (open ? '' : ' locked') + (open && seen.has(day) ? ' seen' : '');
+        card.type='button';
+        card.style.setProperty('--i', i);
+        card.setAttribute('aria-label', open ? `Åpne luke ${day}` : `Luke ${day}, låst`);
+        const icon = open
+          ? `<span class='status' aria-hidden='true'><svg viewBox='0 0 24 24'><path d='M12 2c-.8 0-1.4.6-1.4 1.4v1.6c-2.5.6-4.6 2.8-4.6 5.5 0 3.4-1.4 5-2 5.4h16c-.6-.4-2-2-2-5.4 0-2.7-2.1-4.9-4.6-5.5V3.4c0-.8-.6-1.4-1.4-1.4zM12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2z'/></svg></span>`
+          : `<span class='status' aria-hidden='true'><svg viewBox='0 0 24 24'><rect x='5' y='10' width='14' height='10' rx='2'/><path d='M8 10V8a4 4 0 0 1 8 0v2'/></svg></span>`;
+        card.innerHTML = `${icon}<span class='num'>${day}</span>${BADGE}`;
+        if(open){
+          card.addEventListener('click',()=>openDoor(card,day,d));
+        }else{
+          card.setAttribute('aria-disabled','true');
+          card.addEventListener('click',()=>lockedTap(card,day));
+        }
+        grid.appendChild(card);
+      }
+    }
+
+    btnClose.addEventListener('click', closeModal);
+    modal.addEventListener('click',e=>{ if(e.target===modal) closeModal(); });
+    document.addEventListener('keydown',e=>{
+      if(e.key !== 'Escape') return;
+      closeModal();
+      infoModal.classList.add('hidden');
+    });
+
+    infoBtn.addEventListener('click', openInfo);
+    infoClose.addEventListener('click', ()=>infoModal.classList.add('hidden'));
+    infoModal.addEventListener('click', e=>{ if(e.target===infoModal) infoModal.classList.add('hidden'); });
+
+    // Stjernestøv ved oppstart. To varianter, begge bare CSS-animasjon på transform og opacity, ingen bibliotek:
+    //  «stjerne» (standard): en lys stjerne flyr i en bue fra venstre til høyre og slipper små stjerner som faller og blekner.
+    //  «punkter»: det første forslaget, et glitr av små prikker som sveiper over toppen uten stjerne.
+    // Bytt standard her, eller prøv i adressen med ?stov=punkter, ?stov=stjerne eller ?stov=av. Fjernes etter 6 sekunder, og hoppes over med «redusert bevegelse».
+    const STARDUST_DEFAULT = 'stjerne';
+    function stardust(variant){
+      if(prefersReducedMotion()) return;
+      variant = variant || new URLSearchParams(location.search).get('stov') || STARDUST_DEFAULT;
+      if(variant === 'av') return;
+      document.querySelectorAll('.dust').forEach(e => e.remove());          // ved ny avspilling
+      const stars = variant !== 'punkter';
+      const FLIGHT = 2;                                                       // sekunder for stjernen over skjermen
+      const box = document.createElement('div');
+      box.className = 'dust' + (stars ? ' stars' : '');
+      box.setAttribute('aria-hidden','true');
+      if(stars){
+        box.style.setProperty('--T', FLIGHT + 's');
+        box.innerHTML = '<span class="lead"><span class="lead-y"><span class="lead-star"></span></span></span>';
+      }
+      const N = stars ? 110 : 36;                                           // stjerne-varianten slipper mange små stjerner, som støv
+      for(let k=0;k<N;k++){
+        const f = k/(N-1), p = document.createElement('i');
+        // u: hvor langs buen støvet slippes. Stjernen flyr fra -4vw til 104vw, og støvet starter akkurat der stjernen er på det tidspunktet.
+        const u = stars ? .06 + .88*f : f;
+        const x = stars ? -4 + 108*u : 4 + 92*u;
+        const y = 20 - 11*Math.sin(Math.PI*u) + Math.random()*4 - 2;
+        // størrelse: stjerne-varianten har mest små korn (ca. 68 % på 4–7 px), noen mellomstore (24 % på 7–10 px) og noen få større (8 % på 10–15 px)
+        const r = Math.random();
+        const size = stars ? (r < .68 ? 4 + Math.random()*3 : r < .92 ? 7 + Math.random()*3 : 10 + Math.random()*5) : 3 + Math.random()*4 + (k % 6 === 0 ? 2 : 0);
+        const delay = stars ? u*FLIGHT + Math.random()*.08 : f*1.3 + Math.random()*.2;
+        p.style.cssText = `--x:${(x + (stars ? 0 : Math.random()*4 - 2)).toFixed(1)}vw;--y:${y.toFixed(1)}vh;--dx:${(Math.random()*40 - 20).toFixed(0)}px;--dy:${(40 + Math.random()*80).toFixed(0)}px;--s:${size.toFixed(1)}px;--d:${delay.toFixed(2)}s;--t:${(1.5 + Math.random()).toFixed(2)}s;--r:${(Math.random()*90).toFixed(0)}deg`;
+        box.append(p);
+      }
+      document.body.append(box);
+      setTimeout(() => box.remove(), 6000);
+    }
+
+    let DAYS = [];
+    (async()=>{
+      const loaded = await loadDays();
+      CALENDAR_YEAR = loaded.year;
+      DAYS = loaded.days;
+      applyTexts(loaded);
+      loadSeen();
+      showStatus();
+      render(DAYS);
+      stardust();
+    })();
+  </script>
+</body>
+</html>
