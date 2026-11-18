@@ -57,7 +57,7 @@ Fra nå av oppdateres kalenderen av seg selv hver gang `main` endres på GitHub.
 
 ## 4. Tilpass editoren
 
-Øverst i skriptet i `editor/index.html` er det noen få innstillinger, under overskriften **Innstillinger**. Du kan endre dem rett på GitHub: åpne filen, trykk blyanten, endre teksten mellom de enkle anførselstegnene, og trykk **Commit changes**.
+I `editor/index.html`, omtrent midt i filen, står noen få innstillinger. Søk etter `Innstillinger` (<kbd>Cmd</kbd>+<kbd>F</kbd> på Mac, <kbd>Ctrl</kbd>+<kbd>F</kbd> på Windows). Du kan endre dem rett på GitHub: åpne filen, trykk blyanten, endre teksten mellom de enkle anførselstegnene, og trykk **Commit changes**.
 
 | Innstilling | Hva den gjør | Eksempel |
 | --- | --- | --- |

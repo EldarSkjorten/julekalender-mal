@@ -388,7 +388,7 @@ function rememberOpened(day){
     // Enkel formatering: **fet**, *kursiv*, [lenketekst](https://adresse) og nettadresser som blir klikkbare.
     // Alt lages som DOM-noder (aldri innerHTML), så HTML i teksten vises bare som tekst, og bare http- og https-adresser blir lenker.
     function inlineNodes(text){
-      const out = [], re = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"]+)|\*\*([^*\n]+)\*\*|\*([^*\s](?:[^*\n]*[^*\s])?)\*/g;   // kursiv kan ikke starte eller slutte med mellomrom (som i Markdown), så «5 * 3» står i fred
+      const out = [], re = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"]+)|\*\*([^\n]+?)\*\*(?!\*)|\*([^*\s](?:[^*\n]*[^*\s])?)\*/g;   // kursiv kan ikke starte eller slutte med mellomrom (som i Markdown), så «5 * 3» står i fred
       const link = (url, label) => { const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = label; return a; };
       let last = 0, m;
       while((m = re.exec(text))){

@@ -32,7 +32,7 @@ Prosjektet har tre deler du trenger å kjenne til:
 - `days.json` er filen kalenderen bruker. Den skal **alltid** hete akkurat det, uten årstall, ellers finner ikke kalenderen den.
 - `days-ÅÅÅÅ.json` (for eksempel med årstallet for i år) er en **arkivkopi** med samme innhold. Årstallet i navnet gjør at du kan ta vare på flere år side om side. Den brukes ikke av kalenderen. Se [kapittel 5](#5-neste-år-gjenbruk-arkiv-og-tidligere-versjoner).
 
-Alt du skriver i editoren lagres automatisk som utkast i nettleseren din. Først når du eksporterer og legger filen ut, ser mottakerne det.
+Alt du skriver i editoren lagres automatisk som utkast i nettleseren din. Mottakerne ser det først når du har eksportert og lagt filen på riktig sted (se [kapittel 3](#3-legg-filen-ut-slik-at-kalenderen-oppdateres)).
 
 > [!NOTE]
 > **Hvorfor kan ikke editoren lagre rett til kalenderen?** En nettside kan av sikkerhetsgrunner ikke skrive til filer på maskinen din eller endre noe på nettet på egen hånd. Det er også en bevisst sperre her: editoren skal aldri kunne endre den publiserte kalenderen. Derfor er det et lite mellomsteg, som veiledningen tar deg gjennom.
@@ -79,6 +79,7 @@ Editoren ligger i prosjektet ditt på GitHub. Den må ligge på maskinen din for
    | --- | --- |
    | `**fet skrift**` | **fet skrift** |
    | `*kursiv*` | *kursiv* |
+   | `**fet med *kursiv* inni**` | **fet med *kursiv* inni** |
    | `[les mer](https://eksempel.no/side)` | en lenke med teksten «les mer» |
    | `https://eksempel.no/side` | adressen som klikkbar lenke |
 
@@ -167,7 +168,7 @@ En arkivkopi er filen `days-ÅÅÅÅ.json`, som lastes ned sammen med `days.json
 Prosjektet har en mappe `arkiv/` til slike kopier. Eksportvinduet i editoren har en lenke som åpner opplastingen til den mappen på GitHub (velg filen og trykk **Commit changes**). Mappen publiseres ikke.
 
 > [!WARNING]
-> Arkivkopiene inneholder tekstene dine. Legg dem ikke i et offentlig prosjekt.
+> Arkivkopiene inneholder tekstene dine. Legg dem ikke i et offentlig prosjekt (repo): der kan hvem som helst finne alle tekstene, også gjennom søkemotorer, og de blir liggende i historikken. Kalenderen er bare for dem som har lenka.
 
 ### Tidligere versjoner på GitHub (skjer av seg selv)
 
@@ -198,7 +199,7 @@ Se [Hvis utkastet er borte](#hvis-utkastet-er-borte).
 
 ## 7. Ordliste
 
-- **Repo:** prosjektmappen din på GitHub, med alle filene og hele historikken.
+- **Prosjekt, repo (repository):** prosjektmappen din på GitHub, med alle filene og hele historikken. GitHub kaller det *repository*, og i denne veiledningen heter det *prosjekt*.
 - **Commit:** å lagre en endring på GitHub, med en kort beskrivelse.
 - **Gren (branch):** en parallell kopi av prosjektet, brukt til å prøve noe uten å endre det som er publisert. Hovedgrenen heter `main`.
 - **Publisering (deploy):** å legge ut en ny versjon av siden. Publiseringstjenesten (for eksempel Vercel) gjør det av seg selv etter hver endring i `main`.

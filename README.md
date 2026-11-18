@@ -5,7 +5,7 @@ Ren HTML, CSS og JavaScript. Ingen innlogging for mottakerne, ingen sporing og i
 
 ## Lag din egen kalender
 
-1. Trykk **Use this template → Create a new repository** øverst på denne siden, og velg **Private**. Tekstene dine blir personlige, og et offentlig prosjekt kan leses av alle.
+1. **Står du i malen?** Trykk **Use this template → Create a new repository** øverst på denne siden, og velg **Private**. Tekstene dine blir personlige, og et offentlig prosjekt kan leses av alle. **Står du i din egen kopi?** Gå videre til punkt 2.
 2. Følg [`docs/oppsett.md`](docs/oppsett.md) én gang: publisering og innstillingene i editoren.
 3. Hver jul: følg [`docs/veiledning.md`](docs/veiledning.md).
 

@@ -15,6 +15,8 @@
   at den slår opp låtnavn hos Apple (itunes.apple.com) og Spotify (open.spotify.com) for å kontrollere
   lenkene. Det er ingen nøkler eller innlogging i bruk. Policyen under (Content-Security-Policy)
   hindrer siden i å kontakte noe annet.
+
+  Innstillinger for ditt prosjekt: søk etter «---- Innstillinger» lenger ned i filen (se docs/oppsett.md, kapittel 4).
 -->
 <!doctype html>
 <html lang="no">
@@ -1038,7 +1040,7 @@ const infoDialog = (title, body) => confirmDialog({ title, body, yes:'OK', no:nu
 /* ---- Forhåndsvisning ---- */
 // Samme formatering som i kalenderen (site/index.html): **fet**, *kursiv*, [lenketekst](https://adresse) og nettadresser som lenker. Bare DOM-noder, aldri innerHTML.
 function inlineNodes(text){
-  const out = [], re = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"]+)|\*\*([^*\n]+)\*\*|\*([^*\s](?:[^*\n]*[^*\s])?)\*/g;   // kursiv kan ikke starte eller slutte med mellomrom (som i Markdown), så «5 * 3» står i fred
+  const out = [], re = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"]+)|\*\*([^\n]+?)\*\*(?!\*)|\*([^*\s](?:[^*\n]*[^*\s])?)\*/g;   // kursiv kan ikke starte eller slutte med mellomrom (som i Markdown), så «5 * 3» står i fred
   const link = (url, label) => h('a', { href:url, target:'_blank', rel:'noopener noreferrer', text:label });
   let last = 0, m;
   while ((m = re.exec(text))) {
